@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>   
+<head> 
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no"/>
+  <title>Simple Map</title>
+  <link rel="stylesheet" href="https://js.arcgis.com/3.23/dijit/themes/claro/claro.css">    
+  <link rel="stylesheet" href="https://js.arcgis.com/3.23/esri/css/esri.css">
+    
+  <style> 
+    html, body { height: 100%; margin: 0; padding: 0; }
+    #map
+        {
+            width: 50%;
+            height:100%;
+        }
+    #map2
+        {
+            position: absolute;
+            width: 50%;
+            height:100%;
+            left: 50%;
+            top: 0px;
+        }
+    
+  </style> 
+  
+  <script src="https://js.arcgis.com/3.23/"></script>
+  <script> 
+    var map,map2,demographicsLayerlayernum=0;
+    var layernum=0;
+    require([
+        "esri/map", 
+        "esri/dijit/BasemapGallery", 
+        "esri/arcgis/utils","esri/dijit/Scalebar",
+        "dojo/parser",
+        "esri/geometry/webMercatorUtils",
+        "dojo/dom",
+        "esri/layers/ArcGISDynamicMapServiceLayer",
+        "esri/layers/ImageParameters",
+        "esri/layers/ArcGISImageServiceVectorLayer",
+        "esri/InfoTemplate",
+        "esri/renderers/VectorFieldRenderer",
+        "dijit/layout/BorderContainer",
+        "dijit/layout/ContentPane", 
+        "dijit/TitlePane",
+        "dojo/domReady!"
+        ], function(
+      Map, BasemapGallery, arcgisUtils,Scalebar,
+      parser,
+      webMercatorUtils,dom, ArcGISDynamicMapServiceLayer,ImageParameters,
+      ArcGISImageServiceVectorLayer,
+      InfoTemplate,
+      VectorFieldRenderer,
+    ) {
+      parser.parse();
+
+      map = new Map("map", {
+        basemap: "oceans",
+        center: [-122.45, 37.75],
+        zoom: 10,
+      });
+      
+      map2 = new Map("map2", {
+          basemap: "streets",  
+          center: [-122.45, 37.75], // longitude, latitude
+          zoom: 10,
+        });
+      var flagN=true,flagM=true; 
+      //地图联动
+      map.on("extent-change",function(event){
+            if(flagN){
+                map2.setExtent(event.extent);
+                flagN=false;
+            }
+            else if(!flagN){  
+                    flagN=true;  
+                }  
+        })
+      map2.on("extent-change",function(event){
+            if(flagM){
+                map.setExtent(event.extent);
+                flagM=false;
+            }
+            else if(!flagM){  
+                    flagM=true;  
+                } 
+        })
+      //调用组件实现比例尺
+     var scalebar = new Scalebar({
+          map: map,
+          attachTo: "bottom-left",
+          scalebarUnit: "dual"
+        });
+        //显示坐标
+         map.on("load", function() {
+
+          map.on("mouse-move", showCoordinates);
+          map.on("mouse-drag", showCoordinates);
+        });
+        function showCoordinates(evt) {
+
+          var mp = webMercatorUtils.webMercatorToGeographic(evt.mapPoint);
+
+          dom.byId("info").innerHTML = "经度："+mp.x.toFixed(2) + ", "+"纬度：" + mp.y.toFixed(2);
+        }
+     //显示map图
+        var imageParameters = new ImageParameters();
+        imageParameters.format = "jpeg"; //set the image type to PNG24, note default is PNG8.
+
+        //Takes a URL to a non cached map service.
+        demographicsLayer = new ArcGISDynamicMapServiceLayer("https://sampleserver1.arcgisonline.com/ArcGIS/rest/services/Demographics/ESRI_Population_World/MapServer", {
+          "opacity" : 0.5,
+          "imageParameters" : imageParameters
+        }); 
+
+        var url = "https://sampleserver6.arcgisonline.com/arcgis/rest/services/ScientificData/NDFD_wind/ImageServer";
+                vectorLayer = new ArcGISImageServiceVectorLayer(url, {
+                rendererStyle: VectorFieldRenderer.STYLE_CLASSIFIED_ARROW
+                });
+
+                //Set the size of the arrows based on wind speed  
+                var sizeInfoVar = {
+                  type: "sizeInfo",
+                  minSize: 3,
+                  maxSize: 100,
+                  minDataValue: 0.04,
+                  maxDataValue: 32
+                };
+                var renderer = new VectorFieldRenderer({
+                  style: VectorFieldRenderer.STYLE_BEAUFORT_KN,
+                  flowRepresentation: VectorFieldRenderer.FLOW_TO
+                });
+                //Apply the size settings to the renderer
+                renderer.setVisualVariables([sizeInfoVar]);
+                vectorLayer.setRenderer(renderer); 
+    });  
+    //切换底图
+    function Refresh(){
+            Textbox=document.getElementById("basemap");
+            
+            require(["esri/map", "esri/dijit/Scalebar","dojo/parser", "dijit/layout/BorderContainer", "dijit/layout/ContentPane", "dojo/domReady!"], function(Map, Scalebar,parser) {
+                
+                map.setBasemap(Textbox.value);
+               
+                var scalebar = new Scalebar({
+                map: map,
+                // "dual" displays both miles and kilometers
+                // "english" is the default, which displays miles
+                // use "metric" for kilometers
+                scalebarUnit: "dual"
+              });
+            });
+        }
+     
+    //地图规模scale
+    function scale()
+    {
+      document.getElementById("_scale").value=map.getScale(); 
+    }
+      
+   //动态添加专题图
+   function add_dynamiclayer(){           
+
+                if(document.getElementById("demolayer").checked==true){        
+                    map.addLayer(demographicsLayer);
+                    
+                    layernum= layernum+1;  
+                    document.getElementById('layernum').value=layernum;
+                }
+
+                if(document.getElementById("demolayer").checked==false){        
+                    map.removeLayer(demographicsLayer);
+                    
+                    layernum= layernum-1;  
+                    document.getElementById('layernum').value=layernum;
+                }      
+        }
+
+        function add_imagelayer(){
+                if(document.getElementById("imagelayer").checked==true){        
+                    map.addLayer(vectorLayer);
+                    
+                    layernum= layernum+1;  
+                    document.getElementById('layernum').value=layernum;
+                }
+
+                if(document.getElementById("imagelayer").checked==false){        
+                    map.removeLayer(vectorLayer);
+                    
+                    layernum= layernum-1;  
+                    document.getElementById('layernum').value=layernum;
+                } 
+        } 
+      
+      //卷积
+       var flag=false;
+        function Swipe(){
+          var mydiv=document.getElementById("map");
+            if(flag==false)
+           {
+            mydiv.onmousemove=mm;
+           flag=true;
+           }
+            else
+                {mydiv.onmousemove=null;
+                flag=false;
+                }
+        }
+       
+        function mm(){
+            mousex=event.clientX +0;
+             document.getElementById("map_layer3").style.clip="rect(0px,"+ mousex +"px,750px,0px)";
+        }
+  </script> 
+</head> 
+
+<body class="claro"> 
+
+<div id="map" onmousemove="scale()"
+         data-dojo-type="dijit/layout/ContentPane" 
+         data-dojo-props="region:'center'" 
+         style="padding:0;">
+
+      <span id="info" style="position:absolute; left:300px; top:95%;bottom:5px; color:#000;z-index:50;"></span>
+     scale：<input id="_scale" type="text" value="0">
+    地图类型：<select id="basemap" >
+    <option value="topo">topo</option>
+    <option value="streets">streets</option>
+    <option value="satellite">satellite</option>
+    <option value="hybrid">hybrid</option>
+    <option value="gray">gray</option>
+    <option value="oceans">oceans</option>
+    <option value="national-geographic">national-geographic</option> 
+    <option value="osm">osm</option>
+    <input type="button" value="切换" onclick="Refresh()"/>    
+    </select>
+    </div>
+    
+<div id="map2" >
+    <input id="demolayer" type="checkbox" value="Bike" onchange="add_dynamiclayer()"/>DemoLayer
+    <input id="imagelayer" type="checkbox"  value="Car" onchange="add_imagelayer()" />Imagelayer
+    图层数量：<input type="text" id="layernum" value="0"/>
+    <input type="button" value="Swipe" onclick="Swipe()"/>
+</div>
+</body> 
+
+</html>
